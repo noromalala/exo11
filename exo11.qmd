@@ -1,0 +1,285 @@
+---
+title: "exo11"
+format: html
+editor: visual
+---
+
+## Challenge 1
+
+```{r}
+library(tidyverse)
+f <- "https://raw.githubusercontent.com/difiore/ada-2024-datasets/main/AVONETdataset1.csv"
+d <- read_csv(f, col_names = TRUE)
+```
+
+**Step1**
+
+One-Factor and Inference
+
+Boxplots of log(**Mass**) in relation to **Trophic.Level**
+
+```{r}
+library(ggplot2)
+ggplot(d |>
+         filter (!is.na(Trophic.Level) & !is.na(Migration)),
+       aes(x = as.factor(Migration), y = log(Mass))) +
+  geom_boxplot() +
+  geom_jitter (alpha = 0.05)
+```
+
+**Step 2**
+
+1.  Relationship between log(**Mass**) and **Trophic.Level** and between log(**Mass**) and **Migration**.
+
+```{r}
+lm1 <- lm(log(Mass) ~ Trophic.Level, data = d)
+summary(lm1)
+
+lm2 <- lm(log(Mass) ~ as.factor(Migration), data = d)
+summary(lm2)
+```
+
+2.  Both Trophic.Level and Migration are associated with log(Mass) (ps \<0.01). Since p_values are very small, it suggests that F-statistic is large enough to reject the null hypothesis
+
+3.  The reference level is Migration 1.
+
+    Migration 2 and 3 are different compared to Migration 1
+
+    Reveal and assess differences among the remaining pair of **Migration** categories.
+
+    bonferroni test
+
+```{r}
+bon <- pairwise.t.test(log(d$Mass), d$Migration, p.adj = "bonferroni")
+print(bon)
+```
+
+**Step 3**
+
+Tukey test
+
+```{r}
+maov <- aov(log(Mass) ~ as.factor(Migration), data =d)
+summary(maov)
+
+tukey <- TukeyHSD(maov)
+print(tukey)
+```
+
+**Step 4**
+
+permutation
+
+```{r}
+library(infer)
+
+perm <- lm1 |>
+  hypothesise(null = "independence") |>
+  generate(reps = 1000, type = "permute") |>
+  calculate( stat = "F", order = "model")
+original_F_statistic <- d |> 
+  calculate(model = lm1, stat = "F")
+p_value <- perm |> get_p_value (obs_stat = original_F_statistic)
+p_value
+```
+
+## Challenge 2
+
+Step 1
+
+Create Relative break length and Relative tarsus length
+
+```{r}
+library(dplyr)
+model_beak <- lm(log(Beak.Length_Culmen) ~ log(Mass), data = d)
+model_tarsus <- lm(log(Tarsus.Length) ~ log(Mass), data = d)
+d <- d |>
+  mutate(
+        Relative_Beak_Length = resid(model_beak),
+    Relative_Tarsus_Length = resid(model_tarsus)
+  )
+names(d)
+head(d)
+```
+
+**Step 2**
+
+1.  Boxplot **Relative tarsus length** and **Primary.Lifestyle**
+
+```{r}
+
+library(ggplot2)
+ggplot(d, aes(x = Primary.Lifestyle, y = Relative_Beak_Length )) +
+    geom_boxplot() +
+    xlab("Primary Lifestyle") + ylab ("Relative Tarsus Length")
+              
+
+
+```
+
+2.  Boxplot **Relative Beack Length** and **Trophic Niche**
+
+```{r}
+ggplot(d, aes(x = Trophic.Niche, y =  Relative_Tarsus_Length)) +
+    geom_boxplot(data = subset(d, !is.na(Trophic.Niche))) +
+  xlab("Trophic.Niche") + ylab ("Relative Tarsus Length")
+```
+
+**Step 3**
+
+1.  ANOVA of geographic range size and Migration
+
+```{r}
+hist(d$Range.Size) 
+#Transformation
+d <- d %>%
+  mutate(log_Range_Size = log(Range.Size))
+hist(d$log_Range_Size)
+#get rid of NA
+d_filtered <- d |>
+  filter(!is.na(Migration))
+#ANOVA
+geo_aov <- aov(formula = log_Range_Size ~ as.factor(Migration), data = d)
+summary(geo_aov)
+```
+
+Range size is associated with Migration (p \< 0.01)
+
+```{r}
+x <- 8071 / (8071 + 84798)
+
+# Print eta-squared
+print(x)
+```
+
+8.69% of the variance in range is associated with Migration
+
+2.  Regression coef
+
+```{r}
+lm2 <- lm(log_Range_Size ~ as.factor(Migration), data = d)
+summary(lm2)
+
+```
+
+2.  Migration 1 is the reference level
+
+    Migration 2 and 3 are different compared to Migration 1.
+
+    Relevel and assess differences among the remaining pair of **Migration** categories.
+
+```{r}
+bon1 <- pairwise.t.test(d$log_Range_Size, d$Migration, p.adj = "bonferroni")
+print(bon1)
+```
+
+Migration categories are different from each other (ps \< 0.01) for both Tukey and bonferroni.
+
+Tukey test
+
+```{r}
+tukey1 <- TukeyHSD(geo_aov)
+print(tukey1)
+```
+
+**Step 4**
+
+1.  Anova **Relative Beack Length** and **Primary.Lifestyle**
+
+    Anova **Relative Beack Length** and **Trophic level**
+
+```{r}
+p <- d |> filter(Order1 == "Passeriformes")
+hist(p$Relative_Beak_Length)
+
+passaov1 <- aov(Relative_Beak_Length ~ Primary.Lifestyle, data = p)
+summary (passaov1)
+
+passaov2 <- aov(Relative_Beak_Length ~ Trophic.Level, data = p)
+summary (passaov2)
+```
+
+2.  a\. Plot of each predictor
+
+```{r}
+ggplot(p, aes( x = Primary.Lifestyle, y = Relative_Beak_Length)) +
+  geom_boxplot() +
+    xlab("Primary.Lifestyle") + ylab ("Relative_Beak_Length")
+
+ggplot(p, aes( x = (Trophic.Level), y = Relative_Beak_Length)) +
+  geom_boxplot() +
+    xlab("Trophic.Level") + ylab ("Relative_Beak_Length")
+
+```
+
+2.  b\. by combination of predictor
+
+```{r}
+ggplot(p, aes(x = Primary.Lifestyle, y = Relative_Beak_Length, fill = Trophic.Level)) +
+  geom_boxplot() +
+  xlab("Primary Lifestyle") +
+  ylab("Relative Beak Length") +
+  scale_fill_discrete(name = "Trophic Level")
+```
+
+3.  a\. Linear model for each Primary Lifestyle
+
+```{r}
+lm3 <- lm (!is.na(Primary.Lifestyle) ~ Relative_Beak_Length, data = p)
+summary(lm3)
+
+
+```
+
+The overall p_value is significant, meaning that the Primary Life style is associated with the Relative beak length.
+
+3.  b\. Linear model for each Trophic Level
+
+```{r}
+lm4 <- lm (!is.na(Trophic.Level) ~ Relative_Beak_Length, data = p)
+summary(lm4)
+```
+
+The overall p_value is significant, meaning that the Trophic Level is associated with the Relative beak length. I need TONY.
+
+**Step 5**
+
+Two-factor model ANOVA
+
+```{r}
+m5 <- lm(Relative_Beak_Length ~ Primary.Lifestyle * Trophic.Level, data = p)
+summary(m5)
+
+```
+
+The two variables Primary Lifestyle and the Trophic Level are associated with the relative beak length (p \< 0.01). I need TONY
+
+**Step 6**
+
+Interaction between variables
+
+```{r}
+aov6 <- aov(Relative_Beak_Length ~ Primary.Lifestyle * Trophic.Level * Tail.Length, data = p)
+summary(aov6)
+
+lm6 <- lm (Relative_Beak_Length ~ Primary.Lifestyle * Trophic.Level * Tail.Length, data = p)
+summary(lm6)
+```
+
+There is no interaction effect between Primary lifestyle and tail length (p \> 0.05). However, there is an interaction effect between primary lifestyle, trophic level and tail length (p \< 0.05).
+
+**Step 7**
+
+plot the interaction
+
+```{r}
+interaction.plot(x.factor = p$Primary.Lifestyle, 
+                  trace.factor = p$Trophic.Level, 
+                  response = p$Relative_Beak_Length, 
+                  fun = mean, 
+                  type = "b",  # 'b' for both points and lines
+                  xlab = "Primary Lifestyle", 
+                  ylab = "Relative Beak Length", 
+                  legend = TRUE)
+
+```
