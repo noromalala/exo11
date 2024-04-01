@@ -43,7 +43,7 @@ summary(lm2)
 
 3.  The reference level is Migration 1.
 
-    Migration 2 and 3 are different compared to Migration 1
+    Migration 2 and 3 are different compared to Migration 1. Migration 1 is the reference level.
 
     Reveal and assess differences among the remaining pair of **Migration** categories.
 
@@ -71,16 +71,24 @@ print(tukey)
 permutation
 
 ```{r}
-library(infer)
 
-perm <- lm1 |>
-  hypothesise(null = "independence") |>
-  generate(reps = 1000, type = "permute") |>
-  calculate( stat = "F", order = "model")
-original_F_statistic <- d |> 
-  calculate(model = lm1, stat = "F")
-p_value <- perm |> get_p_value (obs_stat = original_F_statistic)
+library(infer)
+d$log_Mass <- log(d$Mass)
+lm1 <- lm(log_Mass ~ Trophic.Level, data = d)
+original_F_statistic <- summary(lm1$fstatistic[1])
+permuted_F_statistics <- replicate(
+  1000,
+  {
+    d_permuted <- d
+    d_permuted$log_Mass <- sample(d_permuted$log_Mass)
+    lm_permuted <- lm(log(Mass) ~ Trophic.Level, data = d_permuted)
+    summary(lm_permuted)$fstatistic[1]
+  }
+)
+
+p_value <- mean(permuted_F_statistics >= original_F_statistic)
 p_value
+
 ```
 
 ## Challenge 2
@@ -162,9 +170,9 @@ summary(lm2)
 
 ```
 
-2.  Migration 1 is the reference level
+2.  Migration 1 is the reference level.
 
-    Migration 2 and 3 are different compared to Migration 1.
+    Migration 2 and 3 are different compared to Migration 1(ps \< 0.05).
 
     Relevel and assess differences among the remaining pair of **Migration** categories.
 
@@ -231,7 +239,7 @@ summary(lm3)
 
 ```
 
-The overall p_value is significant, meaning that the Primary Life style is associated with the Relative beak length.
+The non-significant p-value of the Relative beak length indicated that beak length is not associated with primary life style.
 
 3.  b\. Linear model for each Trophic Level
 
@@ -240,7 +248,7 @@ lm4 <- lm (!is.na(Trophic.Level) ~ Relative_Beak_Length, data = p)
 summary(lm4)
 ```
 
-The overall p_value is significant, meaning that the Trophic Level is associated with the Relative beak length. I need TONY.
+The p_value of the relative_Beak_Length is non-significant, meaning that the Trophic Level is not associated with the Relative beak length. I need your help to interpret this.
 
 **Step 5**
 
@@ -252,7 +260,7 @@ summary(m5)
 
 ```
 
-The two variables Primary Lifestyle and the Trophic Level are associated with the relative beak length (p \< 0.01). I need TONY
+The two variables Primary Lifestyle and the Trophic Level are associated with the relative beak length in (p \< 0.01). I need TONY
 
 **Step 6**
 
@@ -277,7 +285,7 @@ interaction.plot(x.factor = p$Primary.Lifestyle,
                   trace.factor = p$Trophic.Level, 
                   response = p$Relative_Beak_Length, 
                   fun = mean, 
-                  type = "b",  # 'b' for both points and lines
+                  type = "b",  
                   xlab = "Primary Lifestyle", 
                   ylab = "Relative Beak Length", 
                   legend = TRUE)
